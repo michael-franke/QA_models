@@ -32,7 +32,22 @@ run_model_tso <- function (params, utils) {
     cbind(utils)
   
   webppl(
-    program_file = "qa-models-current.webppl",
+    program_file = "~/Documents/PhD/03_gpt3/QA_models/03-current-models-webppl/qa-models-current.webppl",
+    data = webPPL_data,
+    data_var = "RInput"
+  ) -> output
+  
+  return(output)
+}
+
+run_model_cost <- function (params, utils) {
+  
+  webPPL_data <- tibble('task' = "cost") %>% 
+    cbind(params) %>% 
+    cbind(utils)
+  
+  webppl(
+    program_file = "~/Documents/PhD/03_gpt3/QA_models/03-current-models-webppl/qa-models-current.webppl",
     data = webPPL_data,
     data_var = "RInput"
   ) -> output
@@ -42,13 +57,13 @@ run_model_tso <- function (params, utils) {
 
 priorSampleParams <- function() {
   params <- tibble(
-    'policyAlpha'      = runif(1,min = 2.25, max = 2.75),
-    'questionerAlpha'  = runif(1,min = 3.75, max = 4.25),
-    'R1Alpha'          = runif(1,min = 2.75, max = 3.25),
-    'relevanceBetaR0'  = 0,
-    'relevanceBetaR1'  = runif(1,min = 0.95, max = 0.97),
-    'costWeight'       = runif(1,min = 0.5, max = 3),
-    'questionCost'     = runif(1,min = 0.2, max = 0.3)
+    'policyAlpha'      = runif(1,min = 2.25, max = 2.75), # soft-maximization rationality alpha for action selection in Eq (6)?
+    'questionerAlpha'  = runif(1,min = 3.75, max = 4.25), # soft-maximization rationality alpha of pragmatic questioner in Eq (7)?
+    'R1Alpha'          = runif(1,min = 2.75, max = 3.25), # soft-maximization rationality alpha of R1 in Eq (2)?
+    'relevanceBetaR0'  = 0, # ?
+    'relevanceBetaR1'  = runif(1,min = 0.95, max = 0.97), # beta in Eq (3)
+    'costWeight'       = runif(1,min = 0.5, max = 3), # Cost(r)
+    'questionCost'     = runif(1,min = 0.2, max = 0.3) # Cost(q) included at level of Q1?
   )
   return(params)
 }
@@ -93,24 +108,25 @@ priorSampleUtilsFixed <- function() {
   return(utils)
 }
 
-n_samples = 100
+n_samples = 1#100
 
 priorPred <- map_df(1:n_samples, function(i) {
   message('run ', i)
-  params <- priorSampleParams()
-  ## params <- priorSampleParamsFixed()
+  ##params <- priorSampleParams()
+  params <- priorSampleParamsFixed()
   ## show(params)
-  utils  <- priorSampleUtils()
-  ## utils  <- priorSampleUtilsFixed()
+  ##utils  <- priorSampleUtils()
+  utils  <- priorSampleUtilsFixed()
   ## show(utils)
   out    <- tibble('run' = i) %>%
     cbind(params) %>%
     cbind(utils) %>%
-    cbind(run_model_tso(params, utils))
+    #cbind(run_model_tso(params, utils))
+    cbind(run_model_cost(params, utils))
   return (out)
 })
 
-write_csv(priorPred, 'priorPred.csv')
+#write_csv(priorPred, 'priorPred.csv')
 ## priorPred <- read_csv('priorPred.csv')
 
 priorPredSummary <- priorPred %>% 
