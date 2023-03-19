@@ -32,7 +32,7 @@ run_model_tso <- function (params, utils) {
     cbind(utils)
   
   webppl(
-    program_file = "~/Documents/PhD/03_gpt3/QA_models/03-current-models-webppl/qa-models-current.webppl",
+    program_file = "qa-models-current.webppl",
     data = webPPL_data,
     data_var = "RInput"
   ) -> output
@@ -47,7 +47,22 @@ run_model_cost <- function (params, utils) {
     cbind(utils)
   
   webppl(
-    program_file = "~/Documents/PhD/03_gpt3/QA_models/03-current-models-webppl/qa-models-current.webppl",
+    program_file = "qa-models-current-cost.webppl",
+    data = webPPL_data,
+    data_var = "RInput"
+  ) -> output
+  
+  return(output)
+}
+
+run_model_prior <- function (params, utils) {
+  
+  webPPL_data <- tibble('task' = "prior") %>% 
+    cbind(params) %>% 
+    cbind(utils)
+  
+  webppl(
+    program_file = "qa-models-current-priors.webppl",
     data = webPPL_data,
     data_var = "RInput"
   ) -> output
@@ -98,31 +113,57 @@ priorSampleParamsFixed <- function() {
   return(params)
 }
 
-priorSampleUtilsFixed <- function() {
+priorSampleUtilsFixedSUV <- function() {
   utils <- tibble(
-    'utilTarget'       = 15,
-    'utilCompetitor'   = 10,
-    'utilSameCat'      = 10,
-    'utilOtherCat'     = 5
+    'utilParkingCoffee'     = 1.5,
+    'utilNoParkingCoffee'   = 0.5,
+    'other'                 = 0.01
+  )
+  return(utils)
+}
+priorSampleUtilsFixedPedestrian <- function() {
+  utils <- tibble(
+    'utilParkingCoffee'     = 0.5,
+    'utilNoParkingCoffee'   = 1.5,
+    'other'                 = 0.01
+  )
+  return(utils)
+}
+priorSampleUtilsFixedNeutral <- function() {
+  utils <- tibble(
+    'utilParkingCoffee'     = 1,
+    'utilNoParkingCoffee'   = 1,
+    'other'                 = 0.01
   )
   return(utils)
 }
 
 n_samples = 1#100
 
-priorPred <- map_df(1:n_samples, function(i) {
+priorPred_cost <- map_df(1:n_samples, function(i) {
   message('run ', i)
   ##params <- priorSampleParams()
   params <- priorSampleParamsFixed()
   ## show(params)
   ##utils  <- priorSampleUtils()
-  utils  <- priorSampleUtilsFixed()
-  ## show(utils)
+  utils  <- priorSampleUtilsFixedPedestrian()
+  show(utils)
   out    <- tibble('run' = i) %>%
     cbind(params) %>%
     cbind(utils) %>%
     #cbind(run_model_tso(params, utils))
     cbind(run_model_cost(params, utils))
+  return (out)
+})
+
+priorPred_prior <- map_df(1:n_samples, function(i) {
+  message('run ', i)
+  params <- priorSampleParamsFixed()
+  utils  <- priorSampleUtilsFixed()
+  out    <- tibble('run' = i) %>%
+    cbind(params) %>%
+    cbind(utils) %>%
+    cbind(run_model_prior(params, utils))
   return (out)
 })
 
