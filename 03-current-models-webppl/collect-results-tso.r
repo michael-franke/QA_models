@@ -148,7 +148,8 @@ priorUtilsFixedLowProb <- function() {
 }
 priorUtilsFixedHighProb <- function() {
   utils <- tibble(
-    'R1Context'     = 'priorContextHighProb'
+    'R1Context'     = 'priorContextHighProb',
+#    'RPriorOverPreference' = '0.55,0.25,0.15,0.05'
   )
   return(utils)
 }
@@ -208,5 +209,3 @@ priorPredSummary %>%
   theme(legend.position = 'none') +
   xlab('answer type') +
   ylab('mean prior predictive')
-
-
