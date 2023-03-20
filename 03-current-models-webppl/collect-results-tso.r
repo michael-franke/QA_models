@@ -58,7 +58,7 @@ run_model_cost <- function (params, utils) {
 run_model_prior <- function (params, utils) {
   
   webPPL_data <- tibble('task' = "prior") %>% 
-    cbind(params) %>% 
+    cbind(params)  %>% 
     cbind(utils)
   
   webppl(
@@ -140,21 +140,31 @@ priorSampleUtilsFixedNeutral <- function() {
   )
   return(utils)
 }
-
+priorUtilsFixedLowProb <- function() {
+  utils <- tibble(
+    'R1Context'     = 'priorContextLowProb'
+  )
+  return(utils)
+}
+priorUtilsFixedHighProb <- function() {
+  utils <- tibble(
+    'R1Context'     = 'priorContextHighProb'
+  )
+  return(utils)
+}
 n_samples = 1#100
 
 priorPred_cost <- map_df(1:n_samples, function(i) {
   message('run ', i)
   ##params <- priorSampleParams()
   params <- priorSampleParamsFixed()
-  ## show(params)
+  ##show(params)
   ##utils  <- priorSampleUtils()
   utils  <- priorSampleUtilsFixedPedestrian()
   show(utils)
   out    <- tibble('run' = i) %>%
     cbind(params) %>%
     cbind(utils) %>%
-    #cbind(run_model_tso(params, utils))
     cbind(run_model_cost(params, utils))
   return (out)
 })
@@ -162,7 +172,8 @@ priorPred_cost <- map_df(1:n_samples, function(i) {
 priorPred_prior <- map_df(1:n_samples, function(i) {
   message('run ', i)
   params <- priorSampleParamsFixed()
-  utils  <- priorSampleUtilsFixed()
+  utils  <- priorUtilsFixedLowProb()
+  show(params)
   out    <- tibble('run' = i) %>%
     cbind(params) %>%
     cbind(utils) %>%
