@@ -512,7 +512,7 @@ var R1ContextPosterior = cache(function(context, question, R1PriorContext, param
       var questioner_preference = sample(context.RPriorOverPreference);
       var questioner = Q1(context_sample, questioner_preference, params);
       factor(questioner.score(question.text));
-      return {label: context_label, sample: context_sample, name: context_sample.name}
+      return {label: context_label, sample: context_sample, name: context_sample.name, questioner_preference: questioner_preference}
     }
   )
 })
