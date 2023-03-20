@@ -477,22 +477,24 @@ var Q1 = function(context, params) {
 
 ////////////////////////// Cost extensions ///////////////////////////////
 // R1 beliefs about questioner preferences in an SUV context
-var R1PriorSUVContext_secondaryGoals = {
-  parking: costContextParking,
-  noParking: costContextNoParking,
-  distribution: Categorical({vs: ["parking", "noParking"], ps: [0.8, 0.2]})
-}
+var R1PriorContexts = {
+  R1PriorSUVContext_secondaryGoals: {
+    parking: costContextParking,
+    noParking: costContextNoParking,
+    distribution: Categorical({vs: ["parking", "noParking"], ps: [0.8, 0.2]})
+  },
 // R1 beliefs about questioner preferences in an pedestrian context
-var R1PriorPedestrianContext_secondaryGoals = {
-  parking: costContextParking,
-  noParking: costContextNoParking,
-  distribution: Categorical({vs: ["parking", "noParking"], ps: [0.2, 0.8]})
-}
-// R1 beliefs about questioner preferences in a neutral context
-var R1PriorNeutralContext_secondaryGoals = {
-  parking: costContextParking,
-  noParking: costContextNoParking,
-  distribution: Categorical({vs: ["parking", "noParking"], ps: [0.5, 0.5]})
+  R1PriorPedestrianContext_secondaryGoals: {
+    parking: costContextParking,
+    noParking: costContextNoParking,
+    distribution: Categorical({vs: ["parking", "noParking"], ps: [0.2, 0.8]})
+  },
+ // R1 beliefs about questioner preferences in a neutral context
+  R1PriorNeutralContext_secondaryGoals: {
+    parking: costContextParking,
+    noParking: costContextNoParking,
+    distribution: Categorical({vs: ["parking", "noParking"], ps: [0.5, 0.5]})
+  }
 }
 /////////////////////////////////////////////////////////////////////////
 var R1ContextPosterior = cache(function(context, question, R1PriorContext, params) {
@@ -593,9 +595,9 @@ var makeR = function(){
     var question = contextLocal.questions[0]; 
     console.log('question ', question)
     
-    console.log("R1Prior: ", R1PriorPedestrianContext_secondaryGoals)
+    //console.log("R1Prior: ", R1PriorContexts['R1PriorPedestrianContext_secondaryGoals'])
 
-    var R1Prediction = R1Averager(contextLocal, R1PriorPedestrianContext_secondaryGoals, question, params)
+    var R1Prediction = R1Averager(contextLocal, R1PriorContexts[RInput[0].R1Context], question, params)
     console.log("R1Prediction: ", R1Prediction)
     var R1PredictionReduced = Infer({
       method: 'enumerate'},

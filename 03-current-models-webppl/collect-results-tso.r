@@ -117,7 +117,8 @@ priorSampleUtilsFixedSUV <- function() {
   utils <- tibble(
     'utilParkingCoffee'     = 1.5,
     'utilNoParkingCoffee'   = 0.5,
-    'other'                 = 0.01
+    'other'                 = 0.01,
+    'R1Context'             = 'R1PriorSUVContext_secondaryGoals'
   )
   return(utils)
 }
@@ -125,7 +126,8 @@ priorSampleUtilsFixedPedestrian <- function() {
   utils <- tibble(
     'utilParkingCoffee'     = 0.5,
     'utilNoParkingCoffee'   = 1.5,
-    'other'                 = 0.01
+    'other'                 = 0.01,
+    'R1Context'             = 'R1PriorPedestrianContext_secondaryGoals'
   )
   return(utils)
 }
@@ -133,7 +135,8 @@ priorSampleUtilsFixedNeutral <- function() {
   utils <- tibble(
     'utilParkingCoffee'     = 1,
     'utilNoParkingCoffee'   = 1,
-    'other'                 = 0.01
+    'other'                 = 0.01,
+    'R1Context'             = 'R1PriorNeutralContext_secondaryGoals'
   )
   return(utils)
 }
