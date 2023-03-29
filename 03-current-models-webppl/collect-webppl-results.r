@@ -3,12 +3,12 @@ library(tidyverse)
 library(aida)    # remotes::install_github("michael-franke/aida-package")
 
 
-run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_name = "R1Posterior_BinaryPrefs", file_name_addition = "", highlight1 = c(), highlight2 = c(), highlight3 = c(), highlight4 = c()) {
+run_plot_model <- function (model_file_name = "~/Documents/PhD/03_gpt3/QA_models/03-current-models-webppl/qa-models-current.webppl", task_name = "R1Posterior_BinaryPrefs", file_name_addition = "", highlight1 = c(), highlight2 = c(), highlight3 = c(), highlight4 = c()) {
   webPPL_data = tibble(
     'task' = task_name,
     'R0Alpha'          = 0.0001,
     'policyAlpha'      = 2.5,
-    'qquestionerAlpha' = 4,
+    'questionerAlpha' = 4,
     'R1Alpha'          = 3,
     'relevanceBetaR0'  = 0,
     'relevanceBetaR1'  = 0.95,
@@ -55,11 +55,11 @@ run_plot_model <- function (model_file_name = "qa-models-current.webppl", task_n
     theme(legend.position="none")
 
   factor = 3
-  ggsave(filename = paste0("pics/results-", task_name, file_name_addition, ".pdf"), width = 16/factor, height = 9/factor)
+  ggsave(filename = paste0("~/Documents/PhD/03_gpt3/QA_models/pics/polina-results-", task_name, file_name_addition, ".pdf"), width = 16/factor, height = 9/factor)
 
 }
 
-run_model_tso <- function (model_file_name = "qa-models-current.webppl", task_name = "TSO", file_name_addition = "", highlight1 = c(), highlight2 = c(), highlight3 = c(), highlight4 = c()) {
+run_model_tso <- function (model_file_name = "~/Documents/PhD/03_gpt3/QA_models/03-current-models-webppl/qa-models-current.webppl", task_name = "TSO", file_name_addition = "", highlight1 = c(), highlight2 = c(), highlight3 = c(), highlight4 = c()) {
   webPPL_data = tibble(
     'task'             = task_name,
     'R0Alpha'          = 0.0001,
@@ -83,7 +83,7 @@ run_model_tso <- function (model_file_name = "qa-models-current.webppl", task_na
   return(output)
 }
 
-run_model_tso()
+run_model_tso(task_name="TSO")
 
 
 

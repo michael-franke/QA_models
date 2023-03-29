@@ -224,8 +224,8 @@ var cost = function(response,params) {
 ///////////////////////// PTs context extensions for cost-sensitive QA reasoning /////////////////
 // the alternatives are constructed by <property>_<item>
 // depending on context, the speaker may or may not reason about the property and respective cost
-var costAtoms = ['noParking_coffee', 'parking_coffee', 'grocery']
-var costR1WHResponses = ['noParking_coffee+parking_coffee+grocery']
+var costAtoms = ['noParking_coffee', 'parking_coffee'] // , 'grocery'
+var costR1WHResponses = ['noParking_coffee+parking_coffee'] // +grocery
 // construct the set of possible worlds
 var costPowerSet = filter(
     function(x) {
@@ -246,17 +246,17 @@ var costContext = {
   actions: _.concat(costAtoms, "nothing"), // assume 'nothing' is just doing nothing
   questions: [
     {type: 'single-item', queried: ['coffee'], text: 'Coffee?'}, // assume this is the only possible question for coffee
-    {type: 'single-item', queried: ['grocery'], text: 'Grocery?'}, // distractor
+  //  {type: 'single-item', queried: ['grocery'], text: 'Grocery?'}, // distractor
     {type: 'wh', queried: costAtoms, text: 'Which elements?'},
   ],
   questionerBeliefs: Categorical({vs: costPowerSet}),
-  R0PriorOverWorlds: Delta({v: 'parking_coffee+noParking_coffee+grocery'}),
-  R1PriorOverWorlds: Delta({v: 'parking_coffee+noParking_coffee+grocery'}),
+  R0PriorOverWorlds: Delta({v: 'parking_coffee+noParking_coffee'}),// +grocery
+  R1PriorOverWorlds: Delta({v: 'parking_coffee+noParking_coffee'}), // +grocery
   decisionProblem: function(w, a) { // neutral preference for any coffee shop
       return _.includes(w, a) ?
-                (a == 'parking_coffee'    ? 7  : 
-                 a == 'noParking_coffee'  ? 7  : 
-                                            1) :
+                (a == 'parking_coffee'    ? 7   : 
+                 a == 'noParking_coffee'  ? 7 : 0 ): 
+                                            //1) :
                                            0.0001;
   },
 
@@ -298,7 +298,7 @@ var costContextParking = extend(
                 (a == 'parking_coffee'    ? 7  : 
                  a == 'noParking_coffee'  ? 3  : 
                                             1) :
-                                           0.0001;
+                                            a == 'nothing' ? 0 : -10;
    }
   }
 );
@@ -314,7 +314,7 @@ var costContextNoParking = extend(
                 (a == 'parking_coffee'    ? 3  : 
                  a == 'noParking_coffee'  ? 7  : 
                                             1) :
-                                           0.0001;
+                                            a == 'nothing' ? 0 : -10;
    }
   }
 );
@@ -582,12 +582,13 @@ var makeR = function(){
 
     var contextLocal = extend(
       costContext,
-      {decisionProblem: function(w, a) { // neutral preference for any coffee shop
+      {decisionProblem: function(w, a) { // preference for coffee shop
         return _.includes(w, a) ?
                 (a == 'parking_coffee'    ? RInput[0].utilParkingCoffee  : 
-                 a == 'noParking_coffee'  ? RInput[0].utilNoParkingCoffee  : 
-                                            RInput[0].other) :
-                                           0.0001;
+                 a == 'noParking_coffee'  ? RInput[0].utilNoParkingCoffee :  RInput[0].nothing): 
+                                          //  RInput[0].other) :
+                                           //0.0001
+                                           a == 'nothing' ? 0 : -10
        }
       }
     )
@@ -616,6 +617,36 @@ var makeR = function(){
     terminalViz(R1PredictionReduced,4)
 
     return(R1PredictionReduced)
+
+  } else if (RInput[0].task == 'vizPayoff') {
+
+    console.log('visualizing policy')
+    var params = {
+        policyAlpha     : RInput[0].policyAlpha,
+        questionerAlpha : RInput[0].questionerAlpha,
+        R1Alpha         : RInput[0].R1Alpha,
+        relevanceBetaR0 : RInput[0].relevanceBetaR0,  // beta=1 for only action-utility
+        relevanceBetaR1 : RInput[0].relevanceBetaR1,   //
+        costWeight      : RInput[0].costWeight,
+        questionCost    : RInput[0].questionCost      // cost for a question (relative to no question)
+    }
+
+    var contextLocal = extend(
+      costContext,
+      {decisionProblem: function(w, a) { // preference for coffee shop
+        return _.includes(w, a) ?
+                (a == 'parking_coffee'    ? RInput[0].utilParkingCoffee  : 
+                 a == 'noParking_coffee'  ? RInput[0].utilNoParkingCoffee :  RInput[0].nothing): 
+                                          //  RInput[0].other) :
+                                          a == 'nothing' ? 0 : -10
+       }
+      }
+    )
+    console.log('context local ', contextLocal)
+    var beliefs = Categorical({vs: [""]}) // the assumption that the workd does not have a coffeeshop 
+    terminalViz(beliefs, 4)
+    var policy = getCostActionPolicy(beliefs, contextLocal, params)
+    terminalViz(policy, 4)
   }
 }
 
