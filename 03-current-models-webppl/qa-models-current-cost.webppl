@@ -224,8 +224,8 @@ var cost = function(response,params) {
 ///////////////////////// PTs context extensions for cost-sensitive QA reasoning /////////////////
 // the alternatives are constructed by <property>_<item>
 // depending on context, the speaker may or may not reason about the property and respective cost
-var costAtoms = ['noParking_coffee', 'parking_coffee'] // , 'grocery'
-var costR1WHResponses = ['noParking_coffee+parking_coffee'] // +grocery
+var costAtoms = ['noParking_coffee', 'parking_coffee'] //
+var costR1WHResponses = ['noParking_coffee+parking_coffee'] // 
 // construct the set of possible worlds
 var costPowerSet = filter(
     function(x) {
@@ -246,18 +246,15 @@ var costContext = {
   actions: _.concat(costAtoms, "nothing"), // assume 'nothing' is just doing nothing
   questions: [
     {type: 'single-item', queried: ['coffee'], text: 'Coffee?'}, // assume this is the only possible question for coffee
-  //  {type: 'single-item', queried: ['grocery'], text: 'Grocery?'}, // distractor
     {type: 'wh', queried: costAtoms, text: 'Which elements?'},
   ],
   questionerBeliefs: Categorical({vs: costPowerSet}),
-  R0PriorOverWorlds: Delta({v: 'parking_coffee+noParking_coffee'}),// +grocery
-  R1PriorOverWorlds: Delta({v: 'parking_coffee+noParking_coffee'}), // +grocery
+  R0PriorOverWorlds: Delta({v: 'parking_coffee+noParking_coffee'}),
+  R1PriorOverWorlds: Delta({v: 'parking_coffee+noParking_coffee'}), 
   decisionProblem: function(w, a) { // neutral preference for any coffee shop
       return _.includes(w, a) ?
-                (a == 'parking_coffee'    ? 7   : 
-                 a == 'noParking_coffee'  ? 7 : 0 ): 
-                                            //1) :
-                                           0.0001;
+                (a == 'parking_coffee'    ? 7   : 7 ): 
+                 a == 'nothing' ? 0 : -Infinity;
   },
 
   // R0 chooses among responses licensed by the question
@@ -288,6 +285,7 @@ var costContext = {
 };
 
 // extended context with parking preferences
+// precise util values are actually read form user's intput and override these
 var costContextParking = extend(
   costContext,
   {
@@ -295,10 +293,8 @@ var costContextParking = extend(
     // preferences over coffee places with parking
     decisionProblem: function(w, a) {
       return _.includes(w, a) ?
-                (a == 'parking_coffee'    ? 7  : 
-                 a == 'noParking_coffee'  ? 3  : 
-                                            1) :
-                                            a == 'nothing' ? 0 : -10;
+                (a == 'parking_coffee'    ? 7  : 3 ) :
+                                            a == 'nothing' ? 0 : -Infinity;
    }
   }
 );
@@ -311,10 +307,8 @@ var costContextNoParking = extend(
     // preferences over coffee places without parking
     decisionProblem: function(w, a) {
       return _.includes(w, a) ?
-                (a == 'parking_coffee'    ? 3  : 
-                 a == 'noParking_coffee'  ? 7  : 
-                                            1) :
-                                            a == 'nothing' ? 0 : -10;
+                (a == 'parking_coffee'    ? 3  : 7) :
+                                            a == 'nothing' ? 0 : -Infinity;
    }
   }
 );
@@ -335,14 +329,14 @@ var getCostActionPolicy = function(beliefs, context, params) {
       decisionProblem(world,action)
     })
     factor(params.policyAlpha * EU);
-    return action; //{action: action, type: type};
+    return action; 
   });
   return actPol
 };
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 // returns TRUE if a response is contradictory in the light of the question
-// example: "Do you have any pie?" - "No, we have lemon pie."
+// example: "Is there a coffee place" - "No, there is one with parking around the corner."
 var isContradiction = function(context, question, response) {
   var meaning = context.meaning;
   var isContra = all(
@@ -372,7 +366,6 @@ var updateBeliefs = function(beliefs, question, response, context) {
 var questionUtility = function(utterance, beliefs, context, params) {
   // questioner wants to *maximize* expected payoff under decision problem
   var decisionProblem = context.decisionProblem;
-  //var actionPolicy    = getActionPolicy(beliefs, context, params);
   var actionPolicy    = getCostActionPolicy(beliefs, context, params);
   var actionUtility   = expectation(actionPolicy, function(action) { 
     // weight possible actions proportional to reward
@@ -407,11 +400,8 @@ var R1ContextFree = cache(function(question, context, params) {
                          getLicensedResponsesR1(question));
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(responses);
-    // console.log(response);
     var ownBeliefs = context.R0PriorOverWorlds;
     var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
-    // console.log('updated beliefs: ');
-    // terminalViz(otherBeliefs, 4);
     factor(10 * (-KL(ownBeliefs, otherBeliefs) - cost(response, params)));
     return response;
   });
@@ -451,7 +441,7 @@ var Q1 = function(context, params) {
     var question = uniformDraw(context.questions);
     var expectedUtility = expectation(context.questionerBeliefs, function(trueWorld) {
       var possibleResponses = R0(question, extend(context, {
-        R0PriorOverWorlds: context.R0PriorOverWorlds //Delta({v: trueWorld})
+        R0PriorOverWorlds: Delta({v: trueWorld})
       }), params)
       return expectation(possibleResponses, function(response) {
         var currBeliefs = context.questionerBeliefs;
@@ -479,18 +469,21 @@ var Q1 = function(context, params) {
 // R1 beliefs about questioner preferences in an SUV context
 var R1PriorContexts = {
   R1PriorSUVContext_secondaryGoals: {
+    context_name: "SUV",
     parking: costContextParking,
     noParking: costContextNoParking,
     distribution: Categorical({vs: ["parking", "noParking"], ps: [0.8, 0.2]})
   },
 // R1 beliefs about questioner preferences in an pedestrian context
   R1PriorPedestrianContext_secondaryGoals: {
+    context_name: "Pedestrian",
     parking: costContextParking,
     noParking: costContextNoParking,
     distribution: Categorical({vs: ["parking", "noParking"], ps: [0.2, 0.8]})
   },
  // R1 beliefs about questioner preferences in a neutral context
   R1PriorNeutralContext_secondaryGoals: {
+    context_name: "Neutral",
     parking: costContextParking,
     noParking: costContextNoParking,
     distribution: Categorical({vs: ["parking", "noParking"], ps: [0.5, 0.5]})
@@ -572,34 +565,23 @@ var makeR = function(){
         questionerAlpha : RInput[0].questionerAlpha,
         R1Alpha         : RInput[0].R1Alpha,
         relevanceBetaR0 : RInput[0].relevanceBetaR0,  // beta=1 for only action-utility
-        relevanceBetaR1 : RInput[0].relevanceBetaR1,   //
+        relevanceBetaR1 : RInput[0].relevanceBetaR1,   
         costWeight      : RInput[0].costWeight,
         questionCost    : RInput[0].questionCost      // cost for a question (relative to no question)
       }
-
-    console.log('before: ', paramsGlobal)
-    console.log('after: ', params)
-
     var contextLocal = extend(
       costContext,
-      {decisionProblem: function(w, a) { // preference for coffee shop
+      {decisionProblem: function(w, a) { // preference for coffee shop read from user's input
         return _.includes(w, a) ?
-                (a == 'parking_coffee'    ? RInput[0].utilParkingCoffee  : 
-                 a == 'noParking_coffee'  ? RInput[0].utilNoParkingCoffee :  RInput[0].nothing): 
-                                          //  RInput[0].other) :
-                                           //0.0001
-                                           a == 'nothing' ? 0 : -10
+                (a == 'parking_coffee'    ? RInput[0].utilParkingCoffee : RInput[0].utilNoParkingCoffee) : 
+                                           a == 'nothing' ? RInput[0].utilNothing : -Infinity;
        }
       }
     )
-    console.log('local context: ', contextLocal)
     var question = contextLocal.questions[0]; 
-    console.log('question ', question)
     
-    //console.log("R1Prior: ", R1PriorContexts['R1PriorPedestrianContext_secondaryGoals'])
-
+    
     var R1Prediction = R1Averager(contextLocal, R1PriorContexts[RInput[0].R1Context], question, params)
-    console.log("R1Prediction: ", R1Prediction)
     var R1PredictionReduced = Infer({
       method: 'enumerate'},
       function() {
@@ -607,9 +589,7 @@ var makeR = function(){
         var match = response == 'yes.---' ? true :
             response == 'yes.noParking_coffee' ? true :
             response == 'yes.parking_coffee' ? true :
-            response == 'yes.noParking_coffee+parking_coffee' ? true :
-            response == 'yes.grocery' ? true :
-            response == 'yes.noParking_coffee+parking_coffee+grocery' ? true : false    
+            response == 'yes.noParking_coffee+parking_coffee' ? true : false    
         condition(match)
         return(response)
       })
@@ -618,36 +598,7 @@ var makeR = function(){
 
     return(R1PredictionReduced)
 
-  } else if (RInput[0].task == 'vizPayoff') {
-
-    console.log('visualizing policy')
-    var params = {
-        policyAlpha     : RInput[0].policyAlpha,
-        questionerAlpha : RInput[0].questionerAlpha,
-        R1Alpha         : RInput[0].R1Alpha,
-        relevanceBetaR0 : RInput[0].relevanceBetaR0,  // beta=1 for only action-utility
-        relevanceBetaR1 : RInput[0].relevanceBetaR1,   //
-        costWeight      : RInput[0].costWeight,
-        questionCost    : RInput[0].questionCost      // cost for a question (relative to no question)
-    }
-
-    var contextLocal = extend(
-      costContext,
-      {decisionProblem: function(w, a) { // preference for coffee shop
-        return _.includes(w, a) ?
-                (a == 'parking_coffee'    ? RInput[0].utilParkingCoffee  : 
-                 a == 'noParking_coffee'  ? RInput[0].utilNoParkingCoffee :  RInput[0].nothing): 
-                                          //  RInput[0].other) :
-                                          a == 'nothing' ? 0 : -10
-       }
-      }
-    )
-    console.log('context local ', contextLocal)
-    var beliefs = Categorical({vs: [""]}) // the assumption that the workd does not have a coffeeshop 
-    terminalViz(beliefs, 4)
-    var policy = getCostActionPolicy(beliefs, contextLocal, params)
-    terminalViz(policy, 4)
-  }
+  } 
 }
 
 //////////////////////////////////////////////////
@@ -740,19 +691,6 @@ var consoleOutTSO = function(params) {
   console.log('truth R0 r.: \t', meaning(world,question,responseR0));
 
   var responsesR1 = context.getLicensedResponsesR1
-  // console.log('R1 resp. set \t: ', responsesR1(question))
-
-  // map(
-  //   function(world) {
-  //     console.log("In world ('"+ world +"') the following of R1's responses are true: \n",
-  //                 filter(function (r) {
-  //                   meaning(world,question,r)
-  //                 },
-  //                        responsesR1(question))
-  //                )
-  //   },
-  //   setsOfBakedGoods
-  // )
 
   var responseR1 = responsesR1(question)[0]
   console.log('response R1: \t', responseR1)

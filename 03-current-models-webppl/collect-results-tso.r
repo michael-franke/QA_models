@@ -55,6 +55,7 @@ run_model_cost <- function (params, utils) {
   return(output)
 }
 
+
 run_model_prior <- function (params, utils) {
   
   webPPL_data <- tibble('task' = "prior") %>% 
@@ -115,31 +116,39 @@ priorSampleParamsFixed <- function() {
 
 priorSampleUtilsFixedSUV <- function() {
   utils <- tibble(
-    'utilParkingCoffee'     = 1.5,
-    'utilNoParkingCoffee'   = 0.5,
-    'other'                 = 0.01,
+    'utilParkingCoffee'     = 7,
+    'utilNoParkingCoffee'   = 3,
+    'utilNothing'               = 0,
     'R1Context'             = 'R1PriorSUVContext_secondaryGoals'
   )
   return(utils)
 }
 priorSampleUtilsFixedPedestrian <- function() {
   utils <- tibble(
-    'utilParkingCoffee'     = 0.5,
-    'utilNoParkingCoffee'   = 1.5,
-    'other'                 = 0.01,
+    'utilParkingCoffee'     = 3,
+    'utilNoParkingCoffee'   =  7,
+    'utilNothing'                 = 0,
     'R1Context'             = 'R1PriorPedestrianContext_secondaryGoals'
   )
   return(utils)
 }
-priorSampleUtilsFixedNeutral <- function() {
-  utils <- tibble(
-    'utilParkingCoffee'     = 1,
-    'utilNoParkingCoffee'   = 1,
-    'other'                 = 0.01,
-    'R1Context'             = 'R1PriorNeutralContext_secondaryGoals'
-  )
-  return(utils)
-}
+
+n_samples = 1#100
+
+priorPred_cost <- map_df(1:n_samples, function(i) {
+  message('run ', i)
+  ##params <- priorSampleParams()
+  params <- priorSampleParamsFixed()
+  ##utils  <- priorSampleUtils()
+  utils  <- priorSampleUtilsFixedNeutral()
+  show(utils)
+  out    <- tibble('run' = i) %>%
+    cbind(params) %>%
+    cbind(utils) %>%
+    cbind(run_model_cost(params, utils))
+  return (out)
+})
+
 priorUtilsFixedLowProb <- function() {
   utils <- tibble(
     'R1Context'     = 'priorContextLowProb'
@@ -149,27 +158,10 @@ priorUtilsFixedLowProb <- function() {
 priorUtilsFixedHighProb <- function() {
   utils <- tibble(
     'R1Context'     = 'priorContextHighProb',
-#    'RPriorOverPreference' = '0.55,0.25,0.15,0.05'
+    #    'RPriorOverPreference' = '0.55,0.25,0.15,0.05'
   )
   return(utils)
 }
-n_samples = 1#100
-
-priorPred_cost <- map_df(1:n_samples, function(i) {
-  message('run ', i)
-  ##params <- priorSampleParams()
-  params <- priorSampleParamsFixed()
-  ##show(params)
-  ##utils  <- priorSampleUtils()
-  utils  <- priorSampleUtilsFixedPedestrian()
-  show(utils)
-  out    <- tibble('run' = i) %>%
-    cbind(params) %>%
-    cbind(utils) %>%
-    cbind(run_model_cost(params, utils))
-  return (out)
-})
-
 priorPred_prior <- map_df(1:n_samples, function(i) {
   message('run ', i)
   params <- priorSampleParamsFixed()
