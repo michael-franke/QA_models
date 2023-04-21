@@ -123,48 +123,65 @@ var prepareContextSets = function(atoms) {
     return(replaceEmptyListWithStringNothing(setWithEmptyListElement));
   };
 
+  var makeResponsePowerSet = function (atoms) {
+    // create string representation of all subsets of atoms
+    var setWithEmptyListElement = map(
+      function(v){return v.join('+');},
+      // add possibility to encode background knowledge of number k of available goods
+      filter(function(x) {return x.length <= 8}, powerset(_.flatten(map(function(x){return [x, "not."+x]}, atoms))))
+    );
+    return(replaceEmptyListWithStringNothing(setWithEmptyListElement));
+  };
+
   // The function 'makeR1polarResponses' takes the atoms and the power set and
-  // creates all licensed R1 responses to a polar question.
-  var makeR1polarResponses = function(atoms, powerSet) {
+  // // creates all licensed R1 responses to a polar question.
+  // var makeR1polarResponses = function(atoms, powerSet) {
 
-    var sampleR1PolarResponses = Infer(
-      {method: 'enumerate'},
-      function() {
-        var yesNoPart = uniformDraw(["yes", "no"]);
-        var itemPart = uniformDraw(_.concat(filter(
-          function(x) {
-            if (x != "") {
-              return x
-            }
-          },
-          powerSet
-        ), "---", "nothing"));
-        return [yesNoPart, itemPart].join(".")
-      }
-    )
+  //   var sampleR1PolarResponses = Infer(
+  //     {method: 'enumerate'},
+  //     function() {
+  //       var yesNoPart = uniformDraw(["yes", "no"]);
+  //       // whether negation is used
+  //       // var negPart = uniformDraw(["", "not"]);
+  //       var itemPart = uniformDraw(_.concat(filter(
+  //         function(x) {
+  //           if (x != "") {
+  //             return x
+  //           }
+  //         },
+  //         powerSet
+  //       ), "---", "nothing"));
+  //       return [yesNoPart, itemPart].join(".")
+  //     }
+  //   )
 
-    // exclude utterance 'no, we have ... exhaustive list of everything'
-    // and 'yes, we have nothing'
-    var x = map(function(a) {a == atoms[0] ? a : a + "+" }, atoms.reverse())
-    var contradiction = reduce(function(a, acc) { acc + a }, "no.", x)
-
-    var R1PolarResponses = filter(
-      function(r) {
-        // some responses can never be true
-        r != "yes.nothing" && r != contradiction
-      },
-      sampleR1PolarResponses.support());
-    return(R1PolarResponses)
-  }
-
+  //   // exclude utterance 'no, we have ... exhaustive list of everything'
+  //   // and 'yes, we have nothing'
+  //   var x = map(function(a) {a == atoms[0] ? a : a + "+" }, atoms.reverse())
+  //   var y = map(function(a){a == atoms[0] ? a : a + "+" }, _.flatten(map(function(x){return [x, "+not."+x]}, atoms)).reverse())
+  //   var z = map(function(a){return a + "+not." + a}, atoms)
+  //   var contradiction = _.concat(reduce(function(a, acc) { acc + a }, "no.", x), "no.not.---", "yes.not.nothing", "no.not.nothing", "yes.not.---")
+  //   var contradiction2 = _.concat(reduce(function(a, acc){acc + a}, "yes.", y), contradiction)
+  //   var contradiction3 = _.concat(reduce(function(a, acc){acc + a}, "yes.", z), contradiction2) // TODO technically the same steps should also be done with no but is not relevant in our world (?)
+  //   console.log("contradiction 2", contradiction3)
+  //   // filter out responses that say 'no.not---' and 'yes.not---' and 'yes.not.nothing' and 'no.not.nothing'
+  //   var R1PolarResponses = filter(
+  //     function(r) {
+  //       // some responses can never be true
+  //       r != "yes.nothing" && r != contradiction3
+  //     },
+  //     sampleR1PolarResponses.support());
+  //   return(R1PolarResponses)
+  // }
+  var R1PolarResponses = ['yes.---', 'no.---', 'yes.AE', 'yes.CB', 'yes.not_AE', 'yes.not_CB', 'yes.AE+CB', 'yes.not_AE+CB', 'yes.AE+not_CB'] // assume neither = no.---
   var powerSet = makePowerSet(atoms);
-
+  var responsePowerSet = makeResponsePowerSet(atoms);
   // return powerset, R1 licencesed responses
   var out = {
     'atoms'            : atoms,
     'powerSet'         : powerSet,
     'R1WHResponses'    : powerSet,
-    'R1PolarResponses' : makeR1polarResponses(atoms, powerSet)
+    'R1PolarResponses' : R1PolarResponses//makeR1polarResponses(atoms, responsePowerSet) // powerSet
   }
   return(out)
 }
@@ -174,7 +191,7 @@ var meaningFunction = function(world, question, response) {
 
   // meaning of literals / atoms
   var meaning_atomic = function(world, question, response) {
-    // console.log(" *** now evaluating response: part ", response)
+    // console.log(" *** now evaluating response: part ", response, 'Q ', question, 'W ', world)
     if(response == '' || response == "---") {
       // assume silence has null meaning
       return true;
@@ -187,21 +204,30 @@ var meaningFunction = function(world, question, response) {
     if(world == "nothing" && question.type == 'wh') {
       return response == "nothing";
     }
+    var neg_conjuncts = filter(function(x){return x.split('_')[0] == 'not';}, response.split('+'));
+    var neg_conjuncts_wo_negation = map(function(x){return x.split('_')[1];}, neg_conjuncts);
+    // if the world contains the negated atom, the utterance is false, otherwise true
+    var x = filter(function(x){return !_.includes(neg_conjuncts_wo_negation, x);}, world.split('+'));
+    // NOTE: this hack part is necessary because if the list of stated options is just empty,
+    // the function all() will return true irrespectively of the world
+    var available_stated_conjuncts = x.length === 0 ? ['---'] : x;
+
     if(question.type == 'single-item') {
+      // console.log('single item response ', response.split('+'))
       return (
         response == 'yes' ? _.intersection(world.split('+'), question.queried).length > 0 : 
           response == 'no' ?  _.intersection(world.split('+'), question.queried).length == 0 : 
           all(function(item) { 
             return _.includes(world.split('+'), item);
-          }, response.split('+')));
+          }, available_stated_conjuncts)); // response.split('+')
     } else if(question.type == 'wh') {
         // assume response is true when the shop contains every mentioned item
         return all(function(item) {
           return _.includes(world.split('+'), item);
-        }, response.split('+'));
-      } else {
+        }, available_stated_conjuncts); // response.split('+')
+    } else {
         return console.error('question type not yet supported: ' + question.type);
-      }
+    }
   }
 
   // meaning of conjunctions
@@ -227,8 +253,8 @@ var cost = function(response,params) {
 ///////////////////////// PTs context extensions for prior-sensitive QA reasoning /////////////////
 // the alternatives are constructed by <property>_<item>
 // depending on context, the speaker may or may not reason about the property and respective cost
-var priorAtoms = ['AE', 'MC', 'V', 'CB']
-var priorR1WHResponses = ['AE+MC+V+CB']
+var priorAtoms = ['AE', 'CB']
+var priorR1WHResponses = ['AE+CB', 'AE', 'CB']
 // construct the set of possible worlds
 var priorPowerSet = filter(
     function(x) {
@@ -242,40 +268,32 @@ var priorPowerSet = filter(
 )
 // construct possible responses
 var priorR1PolarResponses = prepareContextSets(priorAtoms).R1PolarResponses;
-// helper for constructing subset probs
-var getSubsetProbs = function(powerset, probs) {
-  var powersetProbsList = map(function(x){
-    return sum(map(function(j){return probs[j]}, x.split("+")))
-  }, powerset);
-  return powersetProbsList
-}
-
-var preferencePrior = {
-    "AE": 0.55,
-    "MC": 0.25,
-    "V": 0.15,
-    "CB": 0.05
-}
+// {typ, atypisch, not typ, not atyp, both, typ & not atyp, atyp & not typ, neiter}
+// var priorR1PolarResponses =  [];
 var priorContext = {
   name : "priorContext",
-  worlds : priorPowerSet,
-  actions: _.concat(priorAtoms, "nothing"), // assume 'nothing' is just doing nothing -- TODO: check if this matches assumption that person chooses to go to restaurant or not
-  questions: [
-    {type: 'single-item', queried: ['AE','MC','V','CB'], text: 'Accept credit cards?'} // TODO: potentially extend with asking for specific types of cards
+  speakerWorlds : priorPowerSet,
+  questionerWorlds: priorPowerSet,
+  actions: ["go", "nothing"], // assume 'nothing' is just doing nothing -- TODO: check if this matches assumption that person chooses to go to restaurant or not
+  questions: [ // TODO adjust question types 
+    {type: 'single-item', queried: ['AE','CB', 'AE+CB'], text: 'Any?'}, // TODO understand to represent the difference between the two (any = non-empty set? which = elements of atoms?)
+    {type: 'wh', queried: ['AE','CB'], text: 'Which?'},
+    {type: 'single-item', queried: ['AE'], text: 'Typical?'},
+    {type: 'single-item', queried: ['CB'], text: 'Atypical?'},
   ],
-  // assume that the probability of occurrence = acceptance of the cards is AE: 0.55, MC: 0.25, V: 0.15, CB: 0.05
-  // assume that acceptance of different cards is disjoint, so unnormalized P(["AE","MC","V","CB"]) = 0.55+0.25+0.15+0.05
-  questionerBeliefs: Categorical({vs: priorPowerSet, ps: getSubsetProbs(priorPowerSet, preferencePrior)}),
+  QPriorOverWorlds: Categorical({vs: priorPowerSet}), //NOTE: this is diffeerent from the typicality driven priors
   // R's prior over questioner's card
-  RPriorOverPreference: Categorical({vs: priorAtoms, ps: [0.55, 0.25, 0.15, 0.05]}),
-  R0PriorOverWorlds: Delta({v: 'AE+MC+V'}), // subject to change in different contexts
-  R1PriorOverWorlds: Delta({v: 'AE+MC+V'}),
-  decisionProblem: function(w, a, c) { // depends on questioner's own card which is passed as c
-      return _.includes(w, a) ?
-                (a == c    ? 7  : 
-                             1) :
-                             0.0001;
+  // RPriorOverPreference: Categorical({vs: priorAtoms, ps: [0.9, 0.1]}),
+  R0PriorOverWorlds: Delta({v: 'AE'}), // subject to change in different contexts
+  R1PriorOverWorlds: Delta({v: 'AE'}),
+  decisionProblem: function(w_s, a) { // depends on questioner's own card , AE in this case
+      return _.includes(w_s, 'AE') ?
+                (a == "go"   ? 0.9 : 0.1) :
+                                          -100000;
   },
+  //decision utility maps triple W_c x W_o x A unto reals, s.t.,
+  // U(wc, wo, “go") = 1 if wo and wc have non-empty intersection (0 otherwise)
+  // U(wc, wo, “stay") = 1 - U(wc, wo, “go”)
 
   // R0 chooses among responses licensed by the question
   getLicensedResponsesR0: function(question) {
@@ -305,28 +323,75 @@ var priorContext = {
 };
 
 // extended context depending on available cards
-var priorContextLowProb = extend(
+// lowProb context is the one where thoe low prob card is available
+var typicalQcontextLowProb = extend(
     priorContext,
     {
       name : "priorContextLowProb",
-      R0PriorOverWorlds: Delta({v: 'AE+MC+CB'}),
-      R1PriorOverWorlds: Delta({v: 'AE+MC+CB'}),
+      R0PriorOverWorlds: Delta({v: 'CB'}),
+      R1PriorOverWorlds: Delta({v: 'CB'}),
+      decisionProblem: function(w_s, a) { // depends on questioner's own card which is passed as c
+        return _.includes(w_s, 'AE') ? // encodes Q's high prob preference
+                  (a == "go"   ? 0.9 : 0.1) :
+                                            -100000;
+      },
     }
 )
+var atypicalQcontextLowProb = extend(
+  priorContext,
+  {
+    name : "priorContextLowProb",
+    R0PriorOverWorlds: Delta({v: 'CB'}),
+    R1PriorOverWorlds: Delta({v: 'CB'}),
+    decisionProblem: function(w_s, a) { // depends on questioner's own card which is passed as c
+      return _.includes(w_s, 'CB') ? // encodes Q's low prob preference
+                (a == "go"   ? 0.9 : 0.1) :
+                -100000;
+    },
+  }
+)
+// highProb context is the one where the high prob card is available
+var typicalQcontextHighProb = extend(
+  priorContext,
+  {
+    name : "priorContextHighProb",
+    R0PriorOverWorlds: Delta({v: 'AE'}),
+    R1PriorOverWorlds: Delta({v: 'AE'}),
+    decisionProblem: function(w_s, a) { // depends on questioner's own card which is passed as c
+      return _.includes(w_s, 'AE') ? // encodes Q's high prob preference
+                (a == "go"   ? 0.9 : 0.1) :
+                -100000;
+    },
+  }
+)
+var atypicalQcontextHighProb = extend(
+  priorContext,
+  {
+    name : "priorContextHighProb",
+    R0PriorOverWorlds: Delta({v: 'AE'}),
+    R1PriorOverWorlds: Delta({v: 'AE'}),
+    decisionProblem: function(w_s, a) { // depends on questioner's own card which is passed as c
+      return _.includes(w_s, 'CB') ? // encodes Q's low prob preference
+                (a == "go"   ? 0.9 : 0.1) :
+                -100000;
+    },
+  }
+)  
 
-// extended context with parking preferences
-var priorContextHighProb = extend(
-    priorContext,
-    {
-      name : "priorContextHighProb",
-      R0PriorOverWorlds: Delta({v: 'AE+MC+V'}),
-      R1PriorOverWorlds: Delta({v: 'AE+MC+V'}),
-    }
-  )
-  
+
 var priorContexts = {
-  'priorContextLowProb': priorContextLowProb,
-  'priorContextHighProb': priorContextHighProb
+  'priorContextLowProb': {
+    context_name: "priorContextLowProb",
+    typicalQ: typicalQcontextLowProb, // low prob state of the world where Q has high prob preferences
+    atypicalQ: atypicalQcontextLowProb, // low prob state of the world where Q has low prob preferences
+    distribution: Categorical({vs: ["typicalQ", "atypicalQ"], ps: [0.9, 0.1]})
+  },
+  'priorContextHighProb': {
+    context_name: "priorContextHighProb",
+    typicalQ: typicalQcontextHighProb, // high prob state of the world where Q has high prob preferences
+    atypicalQ: atypicalQcontextHighProb, // high prob state of the world where Q has low prob preferences
+    distribution: Categorical({vs: ["typicalQ", "atypicalQ"], ps: [0.9, 0.1]})
+  },
 }
 //////////////////////////////////////////////////////////////////////////// 
 
@@ -337,17 +402,18 @@ var priorContexts = {
 ////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////// updated policy with by-cost-type differences /////////////////////////
-var getPriorActionPolicy = function(beliefs, context, type, params) {
+var getPriorActionPolicy = function(beliefs, context, params) {
   var actPol = Infer({method: 'enumerate'}, function() {
     var action = uniformDraw(context.actions);
+    console.log("getPriorActionPolicy ", action)
     // draw type of context
     //var type = uniformDraw(context.type);
     var decisionProblem = context.decisionProblem;
     var EU = expectation(beliefs, function(world) {
-      decisionProblem(world,action,type)
+      decisionProblem(world, action)
     })
     factor(params.policyAlpha * EU);
-    return action; //{action: action, type: type};
+    return action; 
   });
   return actPol
 };
@@ -356,13 +422,15 @@ var getPriorActionPolicy = function(beliefs, context, type, params) {
 // returns TRUE if a response is contradictory in the light of the question
 // example: "Do you have any pie?" - "No, we have lemon pie."
 var isContradiction = function(context, question, response) {
+  // console.log("executing is Contra")
   var meaning = context.meaning;
   var isContra = all(
     function(world) {
       !meaning(world,question,response)
     },
-    context.worlds
+    context.speakerWorlds
   )
+  // console.log('is Contra ', isContra)
   return isContra
 }
 
@@ -381,14 +449,14 @@ var updateBeliefs = function(beliefs, question, response, context) {
 // DP after receiving a response minus the cost:
 // U(Q)
 // _value_ depends on DM's action policy
-var questionUtility = function(utterance, beliefs, context, type, params) {
+var questionUtility = function(utterance, beliefs, context, params) {
   // questioner wants to *maximize* expected payoff under decision problem
   var decisionProblem = context.decisionProblem;
-  var actionPolicy    = getPriorActionPolicy(beliefs, context, type, params);
-  var actionUtility   = expectation(actionPolicy, function(action,type) { // function(action)
+  var actionPolicy    = getPriorActionPolicy(beliefs, context, params);
+  var actionUtility   = expectation(actionPolicy, function(action) { // function(action)
     // weight possible actions proportional to reward
     return expectation(beliefs, function(world) {
-      return decisionProblem(world, action, type); // decisionProblem(world, action);
+      return decisionProblem(world, action); // decisionProblem(world, action);
     });
   });
   return actionUtility - cost(utterance, params);
@@ -406,32 +474,38 @@ var R0 = cache(function(question, context, params) {
   //console.log(context.R0PriorOverWorlds);
   //console.log('R0BeliefSupport ', R0BeliefSupport)
   var world = R0BeliefSupport[0];
+  console.log("R0 world ", world)
   var getLicensedResponsesR0 = context.getLicensedResponsesR0;
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(getLicensedResponsesR0(question));
     var meaning = context.meaning;
     condition(meaning(world, question, response))
+    console.log("R0 returned response ", response)
     return response;
   });
 });
 
 // dummy R0 with response set of R1
 var R1ContextFree = cache(function(question, context, params) {
+  console.log('--------R1ContextFree-----------')
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
   var responses = filter(function(r) {!isContradiction(context, question, r)},
                          getLicensedResponsesR1(question));
   // console.log("R1 dummy, licensed responses: ", responses)
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(responses);
-    // console.log(response);
+    console.log('R1Context free response sample', response);
     var ownBeliefs = context.R0PriorOverWorlds;
-    var otherBeliefs = updateBeliefs(context.questionerBeliefs, question, response, context);
-    // console.log('updated beliefs: ');
-    // terminalViz(otherBeliefs, 4);
+    console.log('own beliefs: ', ownBeliefs);
+    var otherBeliefs = updateBeliefs(context.QPriorOverWorlds, question, response, context);
+    console.log('updated beliefs: ');
+    terminalViz(otherBeliefs, 4);
+    console.log('KL', -KL(ownBeliefs, otherBeliefs))
     factor(10 * (-KL(ownBeliefs, otherBeliefs) - cost(response, params)));
     return response;
   });
 });
+
 
 // gives updated beliefs about world state after hearing response to question
 // based on a pragmatic interpretation of the response (as emitted by R0)
@@ -440,6 +514,7 @@ var updateBeliefsPragmatic = function(beliefs, question, response, context, para
   // var meaning = context.meaning;
   return Infer({method: 'enumerate'}, function() {
     var world = sample(beliefs);
+    console.log('World in updateBeliefsPragmatic: ', world)
     var pragmaticResponse = R0(question, extend(context, {
       R0PriorOverWorlds: Delta({v: world})
     }), params);
@@ -451,7 +526,7 @@ var updateBeliefsPragmatic = function(beliefs, question, response, context, para
 // gives updated beliefs about world state after hearing response to question
 // based on a pragmatic interpretation (as emitted by R0 w/ full answer set of R1)
 var updateBeliefsPragmaticR1 = function(beliefs, question, response, context, params) {
-  var meaning = context.meaning;
+  // var meaning = context.meaning;
   return Infer({method: 'enumerate'}, function() {
     var world = sample(beliefs);
     var pragmaticResponse = R1ContextFree(question, extend(context, {
@@ -464,24 +539,22 @@ var updateBeliefsPragmaticR1 = function(beliefs, question, response, context, pa
 
 // Q1 selects a question with prob proportional to the expected
 // value of the DP after hearing a response
-var Q1 = function(context, type, params) {
-console.log('----------- Q1------------');
-console.log('Q1 params ', params)
+var Q1 = function(context, params) {
   return Infer({method: 'enumerate'}, function(){
     var question = uniformDraw(context.questions);
     //console.log('considering question', question.queried);
-    var expectedUtility = expectation(context.questionerBeliefs, function(trueWorld) {
+    var expectedUtility = expectation(context.QPriorOverWorlds, function(trueWorld) {
       //console.log('Q1 in possible world', trueWorld);
       var possibleResponses = R0(question, extend(context, {
-        R0PriorOverWorlds: context.R0PriorOverWorlds //Delta({v: trueWorld})
+        R0PriorOverWorlds: Delta({v: trueWorld})
       }), params)
       //console.log('respondent: ', possibleResponses)
       return expectation(possibleResponses, function(response) {
         //console.log('considering response ', response );
-        var currBeliefs = context.questionerBeliefs;
+        var currBeliefs = context.QPriorOverWorlds;
        // console.log('currBeliefs ', currBeliefs);
         var updatedBeliefs = updateBeliefsPragmatic(currBeliefs, question, response, context, params);
-        return questionUtility(response, updatedBeliefs, context, type, params);
+        return questionUtility(response, updatedBeliefs, context, params);
       });
     });
     //     console.log('expected utility: ',expectedUtility)
@@ -509,13 +582,15 @@ var R1ContextPosterior = cache(function(context, question, R1PriorContext, param
       var context_sample = extend(
         R1PriorContext[context_label],
         {R1PriorOverWorlds: context.R1PriorOverWorlds});
-      var questioner_preference = sample(context.RPriorOverPreference);
-      var questioner = Q1(context_sample, questioner_preference, params);
+        console.log("---- R1 context posterior context sample ", context_sample)
+      // var questioner_preference = sample(context.RPriorOverPreference);
+      var questioner = Q1(context_sample, params);
       factor(questioner.score(question.text));
-      return {label: context_label, sample: context_sample, name: context_sample.name, questioner_preference: questioner_preference}
+      return {label: context_label, sample: context_sample, name: context_sample.name}
     }
   )
 })
+
 
 // R1 Averager is full rational reasoner, integrating over all relevant uncertainty
 // key assumptions:
@@ -524,6 +599,7 @@ var R1ContextPosterior = cache(function(context, question, R1PriorContext, param
 //   that wasn't mentioned blindly
 var R1Averager = cache(function(context, R1PriorContext, question, params) {
   console.log("R1 averager ---------------\nquestion given: ", question);
+  // console.log("R1 averager context: ", context);
   var getLicensedResponsesR1 = context.getLicensedResponsesR1;
   console.log(getLicensedResponsesR1(question));
   var responses = filter(function(r) {!isContradiction(context, question, r)},
@@ -531,26 +607,27 @@ var R1Averager = cache(function(context, R1PriorContext, question, params) {
   console.log("available responses R1 Averager: ", responses);
   var ownBeliefs = context.R1PriorOverWorlds;
   console.log('ownBeliefs R1Averager ', ownBeliefs)
+  // TODO how do we handle this such that questioner preference is also returned?
   var contextPosterior = marginalize(R1ContextPosterior(context, question,
                                                         R1PriorContext, params), 'sample');
-  console.log("R1 Averager contextPosterior ", terminalViz(contextPosterior));                                                     
+
+  // console.log("R1 Averager contextPosterior ", terminalViz(contextPosterior));                                                     
   return Infer({method: 'enumerate'}, function(){
     var response = uniformDraw(responses);
-     // console.log("\nconsidering response: ", response);
+     console.log("\nconsidering response: ", response);
     var expectedUtility = expectation(
       contextPosterior,
-      function(context_sample, questioner_preference) {
-        //console.log("Context sample: ", context_sample);
-        var otherBeliefs = updateBeliefsPragmaticR1(context_sample.questionerBeliefs, // check if updateBeliefsPragmaticR1 alsdo need to update beliefs about the preference type of the questioner
+      function(context_sample) {
+        var otherBeliefs = updateBeliefsPragmaticR1(context_sample.QPriorOverWorlds,
                                                     question, response, context_sample, params);
-         // console.log("updated beliefs after response: ", response)
-         // terminalViz(otherBeliefs, 4)
+         console.log("=====> updated beliefs after response: ", response)
+         terminalViz(otherBeliefs, 4)
         var decisionProblem = context_sample.decisionProblem;
-        var actionPolicy = getPriorActionPolicy(otherBeliefs, context, questioner_preference, params); 
-        var actionUtility = expectation(actionPolicy, function(action) { // function(action)
+        var actionPolicy = getPriorActionPolicy(otherBeliefs, context, params); 
+        var actionUtility = expectation(actionPolicy, function(action) { 
           // weight possible actions proportional to reward
           return expectation(otherBeliefs, function(world) {
-            return decisionProblem(world, action, questioner_preference); // decisionProblem(world, action);
+            return decisionProblem(world, action); 
           });
         });
         var EU = ((1-params.relevanceBetaR1) * -KL(ownBeliefs, otherBeliefs) +
@@ -589,7 +666,11 @@ var makeR = function(){
 
     console.log('before: ', paramsGlobal)
     console.log('after: ', params)
-    var contextLocal = priorContexts[RInput[0].R1Context]
+    var contextLocal = extend(
+      priorContext,
+      {R0PriorOverWorlds: Delta({v: RInput[0].R0PriorOverWorlds}),
+      R1PriorOverWorlds: Delta({v: RInput[0].R1PriorOverWorlds})}
+    )
    // console.log(map(function(x){return parseFloat(x)}, RInput[0].RPriorOverPreference.split(',')))
     //var contextLocal = extend(
     //  priorContexts[RInput[0].R1Context],
@@ -599,35 +680,22 @@ var makeR = function(){
     var question = contextLocal.questions[0]; 
     console.log('question ', question)
     
-    // R1 knows full context model
-    var R1Prior = {
-      trueWorld: contextLocal,
-      distribution: Categorical({vs: ["trueWorld"]})
-    }
     //console.log("R1Prior: ", priorContextLowProb)
-
-    var R1Prediction = R1Averager(contextLocal, R1Prior, question, params)
+    // NOTE: contextLocal passed here as first arg encodes typical Q preference 
+    var R1Prediction = R1Averager(contextLocal, priorContexts[RInput[0].R1Context], question, params)
     console.log("R1Prediction: ", R1Prediction)
     var R1PredictionReduced = Infer({
       method: 'enumerate'},
       function() {
         var response = sample(R1Prediction);
         var match = response == 'yes.---' ? true :
-            response == 'yes.AE+MC+V+CB' ? true :
-            response == 'yes.AE+MC' ? true :
-            response == 'yes.AE+V+CB' ? true :
-            response == 'yes.AE+V' ? true :
             response == 'yes.AE+CB' ? true :
             response == 'yes.AE' ? true :
-            response == 'yes.MC+V+CB' ? true :
-            response == 'yes.MC+V' ? true :
-            response == 'yes.MC+CB' ? true :
-            response == 'yes.MC' ? true :
-            response == 'yes.V+CB' ? true :
-            response == 'yes.V' ? true :
             response == 'yes.CB' ? true :
-            response == 'yes.AE+MC+V' ? true :
-            response == 'yes.AE+MC+CB' ? true : false    
+            response == 'yes.AE+not_CB' ? true :
+            response == 'yes.not_AE+CB' ? true :
+            response == 'yes.not_AE' ? true :
+            response == 'yes.not_CB' ? true : false    
         condition(match)
         return(response)
       })
