@@ -63,7 +63,7 @@ run_model_prior <- function (params, utils) {
     cbind(utils)
   
   webppl(
-    program_file = "qa-models-current-priors.webppl",
+    program_file = "qa-models-current-priors-updated.webppl",
     data = webPPL_data,
     data_var = "RInput"
   ) -> output
@@ -139,8 +139,8 @@ priorPred_cost <- map_df(1:n_samples, function(i) {
   message('run ', i)
   ##params <- priorSampleParams()
   params <- priorSampleParamsFixed()
-  ##utils  <- priorSampleUtils()
-  utils  <- priorSampleUtilsFixedNeutral()
+  #utils  <- priorSampleUtils()
+  utils  <- priorSampleUtilsFixedSUV()
   show(utils)
   out    <- tibble('run' = i) %>%
     cbind(params) %>%
@@ -149,23 +149,28 @@ priorPred_cost <- map_df(1:n_samples, function(i) {
   return (out)
 })
 
+#########
 priorUtilsFixedLowProb <- function() {
   utils <- tibble(
-    'R1Context'     = 'priorContextLowProb'
+    'R1Context'     = 'priorContextLowProb',
+    'R0PriorOverWorlds' = 'CB',
+    'R1PriorOverWorlds' = 'CB',
+    
   )
   return(utils)
 }
 priorUtilsFixedHighProb <- function() {
   utils <- tibble(
     'R1Context'     = 'priorContextHighProb',
-    #    'RPriorOverPreference' = '0.55,0.25,0.15,0.05'
+    'R0PriorOverWorlds' = 'AE',
+    'R1PriorOverWorlds' = 'AE'
   )
   return(utils)
 }
 priorPred_prior <- map_df(1:n_samples, function(i) {
   message('run ', i)
   params <- priorSampleParamsFixed()
-  utils  <- priorUtilsFixedLowProb()
+  utils  <- priorUtilsFixedHighProb()
   show(params)
   out    <- tibble('run' = i) %>%
     cbind(params) %>%

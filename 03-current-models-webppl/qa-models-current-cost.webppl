@@ -528,6 +528,8 @@ var R1Averager = cache(function(context, R1PriorContext, question, params) {
       function(context_sample) {
         var otherBeliefs = updateBeliefsPragmaticR1(context_sample.questionerBeliefs,
                                                     question, response, context_sample, params);
+                                                    console.log("=====> updated beliefs after response: ", response)
+         terminalViz(otherBeliefs, 4)
         var decisionProblem = context_sample.decisionProblem;
         var actionPolicy = getCostActionPolicy(otherBeliefs, context, params); 
         var actionUtility = expectation(actionPolicy, function(action) { 

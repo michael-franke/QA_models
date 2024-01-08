@@ -1075,7 +1075,7 @@ var makeR = function(){
         return(response)
       })
     // console.log("R1-Averager:")
-    // terminalViz(R1PredictionReduced,4)
+    terminalViz(R1PredictionReduced,4)
 
     return(R1PredictionReduced)
   }
