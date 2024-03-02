@@ -185,7 +185,7 @@ priorPred_prior <- map_df(1:n_samples, function(i) {
 ## priorPred <- read_csv('priorPred.csv')
 
 ## insert relevant df here as input ##
-priorPredSummary <- priorPred_sg %>% 
+priorPredSummary <- priorPred_prior %>% 
   group_by(support) %>% 
   do(aida::summarize_sample_vector(.$prob)) %>% 
   select(-Parameter)
