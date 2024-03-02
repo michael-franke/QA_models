@@ -40,14 +40,14 @@ run_model_tso <- function (params, utils) {
   return(output)
 }
 
-run_model_cost <- function (params, utils) {
+run_model_secondary_goal <- function (params, utils) {
   
   webPPL_data <- tibble('task' = "cost") %>% 
     cbind(params) %>% 
     cbind(utils)
   
   webppl(
-    program_file = "qa-models-current-cost.webppl",
+    program_file = "qa-models-current-secondary-goal.webppl",
     data = webPPL_data,
     data_var = "RInput"
   ) -> output
@@ -63,7 +63,7 @@ run_model_prior <- function (params, utils) {
     cbind(utils)
   
   webppl(
-    program_file = "qa-models-current-priors-updated.webppl",
+    program_file = "qa-models-current-priors.webppl",
     data = webPPL_data,
     data_var = "RInput"
   ) -> output
@@ -118,7 +118,7 @@ priorSampleUtilsFixedSUV <- function() {
   utils <- tibble(
     'utilParkingCoffee'     = 7,
     'utilNoParkingCoffee'   = 3,
-    'utilNothing'               = 0,
+    'utilNothing'           = 0,
     'R1Context'             = 'R1PriorSUVContext_secondaryGoals'
   )
   return(utils)
@@ -126,30 +126,31 @@ priorSampleUtilsFixedSUV <- function() {
 priorSampleUtilsFixedPedestrian <- function() {
   utils <- tibble(
     'utilParkingCoffee'     = 3,
-    'utilNoParkingCoffee'   =  7,
-    'utilNothing'                 = 0,
+    'utilNoParkingCoffee'   = 7,
+    'utilNothing'           = 0,
     'R1Context'             = 'R1PriorPedestrianContext_secondaryGoals'
   )
   return(utils)
 }
 
-n_samples = 1#100
+n_samples = 10#100
 
-priorPred_cost <- map_df(1:n_samples, function(i) {
+priorPred_sg <- map_df(1:n_samples, function(i) {
   message('run ', i)
   ##params <- priorSampleParams()
   params <- priorSampleParamsFixed()
   #utils  <- priorSampleUtils()
-  utils  <- priorSampleUtilsFixedSUV()
+  utils  <- priorSampleUtilsFixedPedestrian()
   show(utils)
   out    <- tibble('run' = i) %>%
     cbind(params) %>%
     cbind(utils) %>%
-    cbind(run_model_cost(params, utils))
+    cbind(run_model_secondary_goal(params, utils))
   return (out)
 })
 
 #########
+# respondent has low prob card
 priorUtilsFixedLowProb <- function() {
   utils <- tibble(
     'R1Context'     = 'priorContextLowProb',
@@ -159,6 +160,7 @@ priorUtilsFixedLowProb <- function() {
   )
   return(utils)
 }
+# respondent has high prob card
 priorUtilsFixedHighProb <- function() {
   utils <- tibble(
     'R1Context'     = 'priorContextHighProb',
@@ -170,7 +172,7 @@ priorUtilsFixedHighProb <- function() {
 priorPred_prior <- map_df(1:n_samples, function(i) {
   message('run ', i)
   params <- priorSampleParamsFixed()
-  utils  <- priorUtilsFixedHighProb()
+  utils  <- priorUtilsFixedLowProb()
   show(params)
   out    <- tibble('run' = i) %>%
     cbind(params) %>%
@@ -182,7 +184,8 @@ priorPred_prior <- map_df(1:n_samples, function(i) {
 #write_csv(priorPred, 'priorPred.csv')
 ## priorPred <- read_csv('priorPred.csv')
 
-priorPredSummary <- priorPred %>% 
+## insert relevant df here as input ##
+priorPredSummary <- priorPred_sg %>% 
   group_by(support) %>% 
   do(aida::summarize_sample_vector(.$prob)) %>% 
   select(-Parameter)
